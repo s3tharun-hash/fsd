@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WorkPulse - Employee Schedule, Permission & Leave Hub</title>
+  <meta name="description" content="Enterprise employee scheduling, shift management, short permission requests, and monthly leave calculation hub.">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22 width=%22100%22 height=%22100%22><text y=%22.9em%22 font-size=%2290%22>⏱️</text></svg>">
+</head>
+<body>
+  <!-- Global App Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">⏱️</div>
+      <div class="brand-info">
+        <h1>WorkPulse Hub</h1>
+        <p>Employee Shifts, Permissions & Monthly Leave Engine</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- Active User Switcher for easy testing -->
+      <div class="user-selector-badge" title="Switch active user to test HR Admin vs Employee views">
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Current User:</span>
+        <select id="currentUserSelect" aria-label="Select Current Active User">
+          <!-- Populated dynamically via JS -->
+        </select>
+        <span id="currentUserRoleBadge" class="role-pill admin">HR Admin</span>
+      </div>
+
+      <!-- Theme Switcher -->
+      <button id="themeToggleBtn" class="icon-btn" title="Toggle Theme" aria-label="Toggle Theme">
+        🌓
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="main-nav" role="tablist">
+    <button class="nav-tab-btn active" data-tab="tab-directory" role="tab" id="tabBtnDirectory">
+      👥 Employee Directory
+    </button>
+    <button class="nav-tab-btn" data-tab="tab-profile" role="tab" id="tabBtnProfile">
+      👤 Employee Profile
+    </button>
+    <button class="nav-tab-btn" data-tab="tab-permissions" role="tab" id="tabBtnPermissions">
+      ⏱️ Permission Requests
+      <span class="tab-badge" id="pendingPermBadge">0</span>
+    </button>
+    <button class="nav-tab-btn" data-tab="tab-leaves" role="tab" id="tabBtnLeaves">
+      📅 Monthly Leave Tracker
+      <span class="tab-badge" id="pendingLeaveBadge">0</span>
+    </button>
+    <button class="nav-tab-btn" data-tab="tab-policies" role="tab" id="tabBtnPolicies">
+      ⚙️ HR Policy & Settings
+    </button>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="app-container">
+    <!-- Top Statistics Summary -->
+    <div class="stat-cards-grid" id="topStatsGrid">
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-title">Total Employees</span>
+          <div class="stat-icon primary">👥</div>
+        </div>
+        <div class="stat-value" id="statTotalEmployees">0</div>
+        <div class="stat-subtext">Active departments & shifts</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-title">Pending Permissions</span>
+          <div class="stat-icon amber">⏱️</div>
+        </div>
+        <div class="stat-value" id="statPendingPermissions">0</div>
+        <div class="stat-subtext" id="statConflictPermissions">0 flagged for review</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-title">Pending Leaves</span>
+          <div class="stat-icon emerald">📅</div>
+        </div>
+        <div class="stat-value" id="statPendingLeaves">0</div>
+        <div class="stat-subtext">Awaiting reviewer balance check</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-title">Deduction Policy</span>
+          <div class="stat-icon cyan">⚖️</div>
+        </div>
+        <div class="stat-value" id="statPolicyState" style="font-size: 1.35rem;">Separate</div>
+        <div class="stat-subtext" id="statPolicySubtext">Permissions not deducted from leave</div>
+      </div>
+    </div>
+
+    <!-- TAB 1: EMPLOYEE DIRECTORY -->
+    <section id="tab-directory" class="tab-content active">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <h2>Employee Directory & Work Schedules</h2>
+          <p>View sectors, team leads, shift start/end times, and configured weekly off days.</p>
+        </div>
+        <div class="header-action-group">
+          <button class="btn btn-primary" id="btnAddNewEmployee" style="display: none;">
+            + Add Employee
+          </button>
+        </div>
+      </div>
+
+      <!-- Filters & Search -->
+      <div class="filter-toolbar">
+        <div class="search-input-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="empSearchInput" placeholder="Search by name, sector, or team lead...">
+        </div>
+        <div class="filter-group">
+          <select id="empSectorFilter" class="filter-select">
+            <option value="">All Sectors / Departments</option>
+          </select>
+          <select id="empOffFilter" class="filter-select">
+            <option value="">All Weekly Off Schedules</option>
+            <option value="weekend">Default Sat & Sun Off</option>
+            <option value="custom">Custom Off Days</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Employee Cards Grid -->
+      <div class="employee-grid" id="employeeCardsGrid">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- TAB 2: EMPLOYEE PROFILE -->
+    <section id="tab-profile" class="tab-content" style="display: none;">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <h2>Employee Profile & Schedule Overview</h2>
+          <p>Inspect weekly shift schedule, monthly leave balance, and permission usage.</p>
+        </div>
+        <div class="header-action-group">
+          <button class="btn btn-secondary" id="btnEditCurrentEmployee" style="display: none;">
+            ✏️ Manage Details & Shift
+          </button>
+          <button class="btn btn-primary" id="btnProfileNewPerm">
+            ⏱️ Request Permission
+          </button>
+          <button class="btn btn-primary" id="btnProfileNewLeave" style="background: linear-gradient(135deg, #10b981, #059669);">
+            📅 Apply for Leave
+          </button>
+        </div>
+      </div>
+
+      <!-- Profile Hero Banner -->
+      <div class="profile-card-hero" id="profileHeroContainer">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Visual Weekly Schedule Bar -->
+      <div class="stat-card" style="margin-bottom: 2rem;">
+        <div class="section-header" style="margin-bottom: 0.5rem;">
+          <div class="section-title-wrap">
+            <h3 style="font-size: 1.1rem; font-weight: 700;">Weekly Shift & Off Days Roster</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted);">
+              Default weekly off days are Saturday and Sunday unless customized below.
+            </p>
+          </div>
+          <span id="profileWeeklyOffBadge" class="status-pill status-approved">Default Sat & Sun Off</span>
+        </div>
+        <div class="weekly-schedule-bar" id="profileWeeklyScheduleRoster">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Monthly Balances Grid for Current Employee -->
+      <div class="stat-cards-grid" id="profileBalancesGrid">
+        <!-- Monthly Leave Allowance, Leave Taken, Remaining Balance, Permission Time Used -->
+      </div>
+
+      <!-- Personal History Lists -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;">
+        <div class="stat-card">
+          <div class="stat-header">
+            <h3 style="font-size: 1.05rem; font-weight: 700;">My Permission Requests</h3>
+            <span class="tab-badge" id="profilePermCount">0 total</span>
+          </div>
+          <div id="profileRecentPermissionsList" style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <h3 style="font-size: 1.05rem; font-weight: 700;">My Leave Requests</h3>
+            <span class="tab-badge" id="profileLeaveCount">0 total</span>
+          </div>
+          <div id="profileRecentLeavesList" style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: PERMISSION REQUESTS -->
+    <section id="tab-permissions" class="tab-content" style="display: none;">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <h2>Permission Requests (Short Time Away)</h2>
+          <p>
+            Track brief absences during work. Automatically flags shift overlaps, duplicate requests, approved leave conflicts, and weekly off days.
+          </p>
+        </div>
+        <div class="header-action-group">
+          <button class="btn btn-primary" id="btnOpenPermissionModal">
+            + New Permission Request
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Toolbar -->
+      <div class="filter-toolbar">
+        <div class="filter-group">
+          <button class="btn btn-secondary btn-sm active" data-perm-filter="all">All Requests</button>
+          <button class="btn btn-secondary btn-sm" data-perm-filter="conflict">⚠️ Flagged Conflicts</button>
+          <button class="btn btn-secondary btn-sm" data-perm-filter="pending">Pending</button>
+          <button class="btn btn-secondary btn-sm" data-perm-filter="approved">Approved</button>
+          <button class="btn btn-secondary btn-sm" data-perm-filter="rejected">Rejected</button>
+        </div>
+        <div class="filter-group">
+          <select id="permEmployeeFilter" class="filter-select">
+            <option value="">All Employees</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Permissions Table -->
+      <div class="data-table-container">
+        <table class="custom-table" id="permissionsTable">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Permission Date</th>
+              <th>Time & Duration</th>
+              <th>Reason</th>
+              <th>Shift & Schedule Flags</th>
+              <th>Status</th>
+              <th>Reviewer & Note</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="permissionsTableBody">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 4: MONTHLY LEAVE TRACKER & CALCULATOR -->
+    <section id="tab-leaves" class="tab-content" style="display: none;">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <h2>Monthly Leave Tracker & Balance Calculator</h2>
+          <p>
+            Calculates leave excluding employee's configured weekly off days. Shows exact excluded dates and live balance preview.
+          </p>
+        </div>
+        <div class="header-action-group">
+          <button class="btn btn-primary" id="btnOpenLeaveModal" style="background: linear-gradient(135deg, #10b981, #059669);">
+            + Apply for Leave
+          </button>
+        </div>
+      </div>
+
+      <!-- Month Navigation & Controls Bar -->
+      <div class="month-nav-bar">
+        <div class="month-nav-controls">
+          <button class="icon-btn" id="btnPrevMonth" title="Previous Month">◀</button>
+          <div class="month-display-title" id="monthDisplayTitle">October 2026</div>
+          <button class="icon-btn" id="btnNextMonth" title="Next Month">▶</button>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          <div class="filter-group">
+            <button class="btn btn-secondary btn-sm active" id="btnViewModeCards">👥 Balances Grid</button>
+            <button class="btn btn-secondary btn-sm" id="btnViewModeCalendar">📅 Interactive Calendar</button>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btnExportMonthlyReport" title="Export CSV Report">
+            📥 Export CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Interactive Month Calendar View (Initially hidden, toggled via button) -->
+      <div class="calendar-container" id="monthCalendarContainer" style="display: none;">
+        <div class="section-header" style="margin-bottom: 0.85rem;">
+          <div>
+            <h3 style="font-size: 1.1rem; font-weight: 700;">Employee Monthly Schedule & Absences Calendar</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted);">
+              Visualizes daily shifts, weekly off days, approved leaves, and short permission windows.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.65rem;">
+            <label style="font-size: 0.82rem; color: var(--text-muted);">Calendar Employee:</label>
+            <select id="calEmployeeSelect" class="filter-select">
+              <!-- Populated via JS -->
+            </select>
+          </div>
+        </div>
+
+        <div class="calendar-header-days">
+          <div class="calendar-header-day">Sun</div>
+          <div class="calendar-header-day">Mon</div>
+          <div class="calendar-header-day">Tue</div>
+          <div class="calendar-header-day">Wed</div>
+          <div class="calendar-header-day">Thu</div>
+          <div class="calendar-header-day">Fri</div>
+          <div class="calendar-header-day">Sat</div>
+        </div>
+        <div class="calendar-days-grid" id="calendarDaysGrid">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- Month Balance Quick Board for All Employees -->
+      <div class="stat-card" id="allEmpLeaveCardsContainer" style="margin-bottom: 1.5rem;">
+        <div class="section-header" style="margin-bottom: 0.75rem;">
+          <h3 style="font-size: 1.1rem; font-weight: 700;" id="cardsBoardMonthHeading">Monthly Leave Balances</h3>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">
+            Weekly off days are not counted towards leave. Permissions and leaves are tracked separately.
+          </span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;" id="allEmpLeaveBalanceCards">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Leave Requests Filter Toolbar -->
+      <div class="filter-toolbar">
+        <div class="filter-group">
+          <button class="btn btn-secondary btn-sm active" data-leave-filter="all">All Leave Requests</button>
+          <button class="btn btn-secondary btn-sm" data-leave-filter="pending">Pending</button>
+          <button class="btn btn-secondary btn-sm" data-leave-filter="approved">Approved</button>
+          <button class="btn btn-secondary btn-sm" data-leave-filter="rejected">Rejected</button>
+        </div>
+        <div class="filter-group">
+          <select id="leaveEmployeeFilter" class="filter-select">
+            <option value="">All Employees</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Leaves Table -->
+      <div class="data-table-container">
+        <table class="custom-table" id="leavesTable">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Leave Window</th>
+              <th>Leave Type</th>
+              <th>Duration (Net Days)</th>
+              <th>Excluded Weekly Offs</th>
+              <th>Reason</th>
+              <th>Status</th>
+              <th>Reviewer & Note</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="leavesTableBody">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 5: HR POLICY & SETTINGS -->
+    <section id="tab-policies" class="tab-content" style="display: none;">
+      <div class="section-header">
+        <div class="section-title-wrap">
+          <h2>HR Policy Configuration & Shift Rules</h2>
+          <p>Manage weekly off defaults, leave allowances, and permission deduction rules.</p>
+        </div>
+        <div class="header-action-group">
+          <button class="btn btn-secondary" id="btnResetData">
+            ↺ Reset Demo Data
+          </button>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;">
+        <!-- Policy Card 1: Permission Deduction Policy -->
+        <div class="stat-card">
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem;">
+            Permission Time & Leave Deduction Policy
+          </h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+            Specify whether short permission hours should reduce monthly leave balances or remain completely independent.
+          </p>
+
+          <div class="switch-control">
+            <div class="switch-label-wrap">
+              <h4>Deduct permission hours from monthly leave</h4>
+              <p>When disabled (default), permission time and monthly leave balances are tracked completely separately.</p>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="policyDeductToggle">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div id="policyDeductConversionWrap" style="display: none; background: var(--bg-surface-elevated); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); margin-top: 1rem;">
+            <label class="form-label">Conversion Rate (Hours = 1 Leave Day):</label>
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.35rem;">
+              <input type="number" id="policyDeductHoursInput" class="form-input" min="1" max="24" value="8" style="width: 100px;">
+              <span style="font-size: 0.85rem; color: var(--text-muted);">hours of approved permission = 1 day leave deduction</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.25rem;">
+            <button class="btn btn-primary" id="btnSaveDeductPolicy">Save Policy Changes</button>
+          </div>
+        </div>
+
+        <!-- Policy Card 2: Company-wide Weekly Off Defaults -->
+        <div class="stat-card">
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem;">
+            Default Weekly Off Schedule
+          </h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+            New employees inherit these days. Saturday & Sunday are selected by default.
+          </p>
+
+          <div class="form-group">
+            <label class="form-label">Select Default Weekly Off Days:</label>
+            <div class="checkbox-group" id="policyDefaultOffCheckboxes">
+              <!-- Dynamically populated days -->
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 1.25rem;">
+            <label class="form-label">Default Monthly Leave Allowance (Days):</label>
+            <input type="number" id="policyDefaultAllowanceInput" class="form-input" step="0.5" min="0" value="2.5" style="width: 140px; margin-top: 0.35rem;">
+          </div>
+
+          <div style="margin-top: 1.25rem;">
+            <button class="btn btn-primary" id="btnSaveScheduleDefaults">Save Roster Defaults</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: ADD / EDIT EMPLOYEE -->
+  <div class="modal-overlay" id="modalEmployee">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalEmployeeTitle">Add / Edit Employee</h3>
+        <button class="modal-close-btn" data-close-modal="modalEmployee">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="formEmployee" class="form-grid">
+          <input type="hidden" id="empFormId">
+
+          <div class="form-group full-width">
+            <label class="form-label" for="empFormName">Full Name *</label>
+            <input type="text" id="empFormName" class="form-input" required placeholder="e.g. Sarah Chen">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="empFormEmail">Email Address</label>
+            <input type="email" id="empFormEmail" class="form-input" placeholder="e.g. sarah.chen@acme.corp">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="empFormSector">Sector / Department *</label>
+            <select id="empFormSector" class="form-select" required>
+              <!-- Filled via JS -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="empFormTeamLead">Team Lead *</label>
+            <input type="text" id="empFormTeamLead" class="form-input" required placeholder="e.g. Marcus Vance">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="empFormMonthlyAllowance">Monthly Leave Allowance (Days)</label>
+            <input type="number" id="empFormMonthlyAllowance" class="form-input" step="0.5" min="0" value="2.5">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="empFormShiftStart">Shift Start Time (24h) *</label>
+            <input type="time" id="empFormShiftStart" class="form-input" value="09:00" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="empFormShiftEnd">Shift End Time (24h) *</label>
+            <input type="time" id="empFormShiftEnd" class="form-input" value="18:00" required>
+          </div>
+
+          <div class="form-group full-width">
+            <label class="form-label">Weekly Off Days (Saturday & Sunday default):</label>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+              These days are excluded from leave calculations and will trigger conflict warnings if permissions are requested on them.
+            </p>
+            <div class="checkbox-group" id="empFormWeeklyOffCheckboxes">
+              <!-- Dynamically populated Mon-Sun -->
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modalEmployee">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnSaveEmployeeSubmit">Save Employee</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NEW PERMISSION REQUEST -->
+  <div class="modal-overlay" id="modalPermission">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Request Short Permission (Time Away)</h3>
+        <button class="modal-close-btn" data-close-modal="modalPermission">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="formPermission" class="form-grid">
+          <div class="form-group full-width">
+            <label class="form-label" for="permFormEmployee">Employee *</label>
+            <select id="permFormEmployee" class="form-select" required>
+              <!-- Filled via JS -->
+            </select>
+          </div>
+
+          <div class="form-group full-width">
+            <label class="form-label" for="permFormDate">Permission Date *</label>
+            <input type="date" id="permFormDate" class="form-input" required value="2026-10-15">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="permFormStartTime">Start Time (24h) *</label>
+            <input type="time" id="permFormStartTime" class="form-input" value="10:00" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="permFormEndTime">End Time (24h) *</label>
+            <input type="time" id="permFormEndTime" class="form-input" value="12:00" required>
+          </div>
+
+          <div class="form-group full-width">
+            <label class="form-label" for="permFormReason">Reason for Permission *</label>
+            <textarea id="permFormReason" class="form-textarea" required placeholder="e.g. Doctor appointment, family emergency, official bank work..."></textarea>
+          </div>
+
+          <!-- Realtime Conflict & Shift Overlap Feedback Area -->
+          <div class="form-group full-width" id="permConflictCheckResult">
+            <!-- Dynamically populated live on change -->
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modalPermission">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnSubmitPermission">Submit Permission Request</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REVIEW PERMISSION REQUEST -->
+  <div class="modal-overlay" id="modalPermissionReview">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Review Permission Request</h3>
+        <button class="modal-close-btn" data-close-modal="modalPermissionReview">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="permReviewDetails" style="display: flex; flex-direction: column; gap: 1rem;">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div class="form-group" style="margin-top: 1.25rem;">
+          <label class="form-label" for="permReviewerName">Reviewer Name</label>
+          <input type="text" id="permReviewerName" class="form-input" value="Sarah Chen">
+        </div>
+
+        <!-- Conflict Resolution Choices (Displayed when request has conflicts) -->
+        <div id="permConflictResolutionBox" class="conflict-resolution-box" style="display: none;">
+          <h4>⚠️ Conflict Resolution Required by Reviewer</h4>
+          <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+            This request falls on an approved leave day or weekly off day. Please select the resolution outcome:
+          </p>
+          <div class="resolution-radio-group">
+            <label class="resolution-radio-option">
+              <input type="radio" name="permConflictResolution" value="Approved with Special Permission" checked>
+              <div>
+                <strong>Acknowledge & Approve as Special Permission</strong>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Confirms necessity during off/leave day without penalty</div>
+              </div>
+            </label>
+            <label class="resolution-radio-option">
+              <input type="radio" name="permConflictResolution" value="Compensatory Off Granted">
+              <div>
+                <strong>Grant Compensatory Off (Comp-Off)</strong>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Employee given alternate off-time credit</div>
+              </div>
+            </label>
+            <label class="resolution-radio-option">
+              <input type="radio" name="permConflictResolution" value="Leave Adjusted">
+              <div>
+                <strong>Adjust Approved Leave Window</strong>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Resolves overlap against previously booked leave</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 0.75rem;">
+          <label class="form-label" for="permReviewNote">Review Note / Handover Instructions</label>
+          <textarea id="permReviewNote" class="form-textarea" placeholder="Add guidance, conflict resolution remarks, or handover instructions..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modalPermissionReview">Close</button>
+        <button type="button" class="btn btn-danger" id="btnRejectPermission">Reject Request</button>
+        <button type="button" class="btn btn-success" id="btnApprovePermission">Approve Request</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: APPLY FOR LEAVE (WITH LIVE BALANCE IMPACT CALCULATOR) -->
+  <div class="modal-overlay" id="modalLeave">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h3>Apply for Monthly Leave</h3>
+        <button class="modal-close-btn" data-close-modal="modalLeave">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="formLeave" class="form-grid">
+          <div class="form-group full-width">
+            <label class="form-label" for="leaveFormEmployee">Employee *</label>
+            <select id="leaveFormEmployee" class="form-select" required>
+              <!-- Filled via JS -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="leaveFormStartDate">Start Date *</label>
+            <input type="date" id="leaveFormStartDate" class="form-input" value="2026-10-16" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="leaveFormEndDate">End Date *</label>
+            <input type="date" id="leaveFormEndDate" class="form-input" value="2026-10-20" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="leaveFormType">Leave Type *</label>
+            <select id="leaveFormType" class="form-select" required>
+              <option value="Casual Leave">Casual Leave</option>
+              <option value="Annual Leave">Annual Leave</option>
+              <option value="Medical / Sick Leave">Medical / Sick Leave</option>
+              <option value="Emergency Leave">Emergency Leave</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="leaveFormReason">Reason *</label>
+            <input type="text" id="leaveFormReason" class="form-input" required placeholder="e.g. Vacation, medical procedure, family obligation">
+          </div>
+
+          <!-- Dynamic Live Calculation Preview -->
+          <div class="form-group full-width">
+            <div class="calc-impact-box" id="leaveLiveCalcBox">
+              <!-- Live balance impact & excluded weekly off days rendered dynamically -->
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modalLeave">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnSubmitLeave" style="background: linear-gradient(135deg, #10b981, #059669);">
+          Submit Leave Request
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REVIEW LEAVE REQUEST -->
+  <div class="modal-overlay" id="modalLeaveReview">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Review Leave Request & Balance Impact</h3>
+        <button class="modal-close-btn" data-close-modal="modalLeaveReview">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="leaveReviewDetails" style="display: flex; flex-direction: column; gap: 1rem;">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div class="form-group" style="margin-top: 1.25rem;">
+          <label class="form-label" for="leaveReviewerName">Reviewer Name</label>
+          <input type="text" id="leaveReviewerName" class="form-input" value="Sarah Chen">
+        </div>
+
+        <div class="form-group" style="margin-top: 0.75rem;">
+          <label class="form-label" for="leaveReviewNote">Review Note</label>
+          <textarea id="leaveReviewNote" class="form-textarea" placeholder="Add approvals, coverage instructions, or reasons for rejection..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modalLeaveReview">Close</button>
+        <button type="button" class="btn btn-danger" id="btnRejectLeave">Reject Leave</button>
+        <button type="button" class="btn btn-success" id="btnApproveLeave">Approve Leave</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Main ES6 Modules Entry Point -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

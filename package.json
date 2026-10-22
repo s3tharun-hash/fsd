@@ -1,0 +1,13 @@
+{
+  "name": "emp-schedule-leave-mgmt",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Employee schedule, permission requests, and monthly leave management system",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["hr", "employee-management", "leave-tracker", "permission-requests"],
+  "author": "",
+  "license": "MIT"
+}
